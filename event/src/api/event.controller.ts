@@ -1,5 +1,5 @@
 import {Request, Response} from 'express';
-import { publishMessage, sendRpc } from '../amqp/rpc';
+import { publishMessage, sendRpc } from '../amqp/queue';
 import config from '../config';
 import { v4 as uuid } from 'uuid';
 import Joi from 'joi';

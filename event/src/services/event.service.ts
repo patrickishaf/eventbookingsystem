@@ -5,6 +5,11 @@ const eventService = {
     const newEventId = await insertEvent(event);
     return await findEventById(newEventId);
   },
+  
+  async getEventInfo(eventId: number) {
+    const event = await findEventById(eventId);
+    return event;
+  },
 }
 
 export default eventService;
