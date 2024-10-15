@@ -1,5 +1,5 @@
 const waitlistService = {
-  createEmptyWaitingList(eventId: number) {},
+  async createEmptyWaitingList(eventId: number) {},
 };
 
 export default waitlistService;

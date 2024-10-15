@@ -20,8 +20,8 @@ export async function listenToQueue() {
       const data = JSON.parse(msg.content.toString());
 
       if (msg.properties.correlationId) {
-        const result = await handleQueueMessage(data);
         console.log('processing rpc', data);
+        const result = await handleQueueMessage(data);
         channel.sendToQueue(msg.properties.replyTo, Buffer.from(JSON.stringify(result)), {
           correlationId: msg.properties.correlationId,
         })
