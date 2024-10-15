@@ -1,9 +1,12 @@
 import {Request, Response} from 'express';
-import { sendRpc } from '../amqp/rpc';
+import { publishMessage, sendRpc } from '../amqp/rpc';
 import config from '../config';
 import { v4 as uuid } from 'uuid';
 import Joi from 'joi';
 import { validateSchema } from '../utils';
+import { OutgoingEvents } from '../amqp/events';
+import { Event } from '../models/event';
+import eventService from '../services/event.service';
 
 const eventController = {
   async initializeEvent(req: Request, res: Response) {
@@ -17,10 +20,22 @@ const eventController = {
       if (errorMsg) {
         return res.status(400).json('failed to initialize event');
       }
-      const response = await sendRpc(config.waitlistQueue!, { data: 'test data in queue'}, uuid());
-      console.log({ response });
-      return res.status(201).json({ message: 'initialized event', data: response });
+
+      const { name, desc, total_tickets } = req.body;
+      const newEventData: Partial<Event> = {
+        name,
+        total_tickets,
+        remaining_tickets: total_tickets,
+      }
+      if (desc) newEventData.description = desc;
+      
+      const newEvent = await eventService.createNewEvent(newEventData);
+      console.log('created event:', newEvent);
+      
+      publishMessage(config.waitlistQueue!, { event: OutgoingEvents.createWaitlist });
+      return res.status(201).json({ message: 'initialized event', data: newEvent });
     } catch (err: any) {
+      console.log('failed to create event. error:', err.message);
       return res.status(500).json(err.message)
     }
   },

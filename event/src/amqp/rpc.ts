@@ -1,5 +1,6 @@
 import amqplib from 'amqplib';
 import config from '../config';
+import { v4 as uuid } from 'uuid';
 
 let amqpConnection = null;
 
@@ -26,9 +27,10 @@ export async function listenForRpcs() {
   })
 }
 
-export async function sendRpc(queueName: string, requestPayload: any, correlationId: string) {
+export async function sendRpc(queueName: string, requestPayload: any) {
   const channel = await getChannel();
   const q = await channel.assertQueue(queueName);
+  const correlationId = uuid();
   channel.sendToQueue(queueName, Buffer.from(JSON.stringify(requestPayload)), {
     replyTo: q.queue,
     correlationId: correlationId,
@@ -44,4 +46,10 @@ export async function sendRpc(queueName: string, requestPayload: any, correlatio
       }
     })
   })
+}
+
+export async function publishMessage(queueName: string, requestPayload: any) {
+  const channel = await getChannel();
+  await channel.assertQueue(queueName);
+  channel.sendToQueue(queueName, Buffer.from(JSON.stringify(requestPayload)));
 }
