@@ -1,8 +1,15 @@
 import express from 'express';
 import config from './config';
+import registerHandlers from './api/registerhandlers';
 
-const app = express();
+async function main() {
+  const app = express();
 
-app.listen(config.port, () => {
-  console.log('event service listening on port', config.port);
-});
+  registerHandlers(app);
+
+  app.listen(config.port, () => {
+    console.log('event service listening on port', config.port);
+  });
+}
+
+main();

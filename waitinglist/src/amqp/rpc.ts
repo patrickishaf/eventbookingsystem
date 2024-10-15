@@ -1,0 +1,47 @@
+import amqplib from 'amqplib';
+import config from '../config';
+
+let amqpConnection = null;
+
+async function getChannel() {
+  if (!amqpConnection) {
+    amqpConnection = await amqplib.connect(config.messageBrokerUrl);
+  }
+  return await (amqpConnection! as ReturnType<amqplib.connect>).createChannel()
+}
+
+export async function listenForRpcs() {
+  const channel = await getChannel();
+  await channel.assertQueue(config.waitlistQueue, { durable: true });
+  channel.prefetch(1);
+  channel.consume(config.waitlistQueue, (msg) => {
+    if (msg.content) {
+      const data = JSON.parse(msg.content.toString());
+      console.log('received data in the rpc server', data);
+      channel.sendToQueue(msg.properties.replyTo, Buffer.from(JSON.stringify({ event: 'RPC_RESPONSE', data: 'received a response' })), {
+        correlationId: msg.properties.correlationId,
+      })
+    }
+    channel.ack(msg);
+  })
+}
+
+export async function sendRpc(queueName: string, requestPayload: any, correlationId: string) {
+  const channel = await getChannel();
+  const q = await channel.assertQueue(queueName);
+  channel.sendToQueue(queueName, Buffer.from(JSON.stringify(requestPayload)), {
+    replyTo: q.queue,
+    correlationId: correlationId,
+  })
+
+  return new Promise((resolve, reject) => {
+    channel.consume(q.queue, (msg) => {
+      channel.ack(msg)
+      if (msg.properties.correlationId === correlationId) {
+        resolve(JSON.parse(msg.content.toString()));
+      } else {
+        reject('data not found');
+      }
+    })
+  })
+}
