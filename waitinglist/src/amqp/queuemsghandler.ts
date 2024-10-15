@@ -1,0 +1,1 @@
+export default async function handleQueueMessage(data: any) {}

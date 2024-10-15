@@ -1,10 +1,10 @@
 import express from 'express';
 import config from './config';
-import { listenForRpcs } from './amqp/rpc';
+import { listenToQueue } from './amqp/queue';
 
 async function main() {
   const app = express();
-  await listenForRpcs();
+  await listenToQueue();
 
   app.listen(config.port, () => {
     console.log('waiting list service listening on port', config.port);

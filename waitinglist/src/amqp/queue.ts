@@ -1,5 +1,6 @@
 import amqplib from 'amqplib';
 import config from '../config';
+import handleQueueMessage from './queuemsghandler';
 
 let amqpConnection = null;
 
@@ -10,17 +11,24 @@ async function getChannel() {
   return await (amqpConnection! as ReturnType<amqplib.connect>).createChannel()
 }
 
-export async function listenForRpcs() {
+export async function listenToQueue() {
   const channel = await getChannel();
   await channel.assertQueue(config.waitlistQueue, { durable: true });
   channel.prefetch(1);
-  channel.consume(config.waitlistQueue, (msg) => {
+  channel.consume(config.waitlistQueue, async (msg) => {
     if (msg.content) {
       const data = JSON.parse(msg.content.toString());
-      console.log('received data in the rpc server', data);
-      channel.sendToQueue(msg.properties.replyTo, Buffer.from(JSON.stringify({ event: 'RPC_RESPONSE', data: 'received a response' })), {
-        correlationId: msg.properties.correlationId,
-      })
+
+      if (msg.properties.correlationId) {
+        const result = await handleQueueMessage(data);
+        console.log('processing rpc', data);
+        channel.sendToQueue(msg.properties.replyTo, Buffer.from(JSON.stringify(result)), {
+          correlationId: msg.properties.correlationId,
+        })
+      } else {
+        console.log('processing regular msg');
+        handleQueueMessage(data);
+      }
     }
     channel.ack(msg);
   })
