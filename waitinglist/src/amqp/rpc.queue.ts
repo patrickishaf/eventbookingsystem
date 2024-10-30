@@ -1,22 +1,12 @@
-import amqplib from 'amqplib';
-import { v4 as uuid } from 'uuid';
 import config from '../config';
 import handleQueueMessage from './queuemsghandler';
+import { getRpcChannel } from './connection';
 
-let amqpConnection = null;
-
-async function getChannel() {
-  if (!amqpConnection) {
-    amqpConnection = await amqplib.connect(config.messageBrokerUrl);
-  }
-  return await (amqpConnection! as ReturnType<amqplib.connect>).createChannel()
-}
-
-export async function listenToQueue() {
-  const channel = await getChannel();
-  await channel.assertQueue(config.bookingQueue, { durable: true });
+export async function listenToRpcQueue() {
+  const channel = await getRpcChannel();
+  await channel.assertQueue(config.waitlistQueue, { durable: true });
   channel.prefetch(1);
-  channel.consume(config.bookingQueue, async (msg) => {
+  channel.consume(config.waitlistQueue, async (msg) => {
     if (msg.content) {
       const data = JSON.parse(msg.content.toString());
 
@@ -35,10 +25,9 @@ export async function listenToQueue() {
   })
 }
 
-export async function sendRpc(queueName: string, requestPayload: any) {
-  const channel = await getChannel();
-  const q = await channel.assertQueue(queueName);
-  const correlationId = uuid();
+export async function sendRpc(queueName: string, requestPayload: any, correlationId: string) {
+  const channel = await getRpcChannel();
+  const q = await channel.assertQueue(queueName, { durable: true });
   channel.sendToQueue(queueName, Buffer.from(JSON.stringify(requestPayload)), {
     replyTo: q.queue,
     correlationId: correlationId,
@@ -46,18 +35,12 @@ export async function sendRpc(queueName: string, requestPayload: any) {
 
   return new Promise((resolve, reject) => {
     channel.consume(q.queue, (msg) => {
-      channel.ack(msg)
       if (msg.properties.correlationId === correlationId) {
         resolve(JSON.parse(msg.content.toString()));
       } else {
         reject('data not found');
       }
+      channel.ack(msg)
     })
   })
-}
-
-export async function publishMessage(queueName: string, requestPayload: any) {
-  const channel = await getChannel();
-  await channel.assertQueue(queueName);
-  channel.sendToQueue(queueName, Buffer.from(JSON.stringify(requestPayload)));
 }

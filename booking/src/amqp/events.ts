@@ -1,6 +1,7 @@
 export enum OutgoingEvents {
   eventInfo = 'event_info',
   addToWaitlist = 'add_to_waitlist',
+  decrementTickets = 'decrement_tickets',
 }
 
 export enum IncomingEvents {

@@ -22,3 +22,9 @@ export async function findEventById(id: number) {
   const event = (await query) as Event;
   return event;
 }
+
+export async function updateEvent(id: number, data: Partial<Event>) {
+  const query = db(_tableName).where('id', id).update(data);
+  const eventId = await query;
+  return eventId;
+}

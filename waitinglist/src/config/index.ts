@@ -11,6 +11,4 @@ const config = {
   dbName: process.env.DB_NAME,
 };
 
-console.log('waiting list service config =>', config);
-
 export default config;

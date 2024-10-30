@@ -1,24 +1,16 @@
-import amqplib from 'amqplib';
 import config from '../config';
 import { v4 as uuid } from 'uuid';
 import handleQueueMessage from './queuemsghandler';
+import { getRpcChannel } from './connection';
 
-let amqpConnection = null;
-
-async function getChannel() {
-  if (!amqpConnection) {
-    amqpConnection = await amqplib.connect(config.messageBrokerUrl);
-  }
-  return await (amqpConnection! as ReturnType<amqplib.connect>).createChannel()
-}
-
-export async function listenToQueue() {
-  const channel = await getChannel();
-  await channel.assertQueue(config.eventQueue, { durable: true });
+export async function listenToRpcQueue() {
+  const channel = await getRpcChannel();
+  await channel.assertQueue(config.eventRpcQueue, { durable: true });
   channel.prefetch(1);
-  channel.consume(config.eventQueue, async (msg) => {
+  channel.consume(config.eventRpcQueue, async (msg) => {
     if (msg.content) {
       const data = JSON.parse(msg.content.toString());
+      console.log('event RPC queue received a message', data);
       
       if (msg.properties.correlationId) {
         console.log('processing rpc', data);
@@ -32,32 +24,31 @@ export async function listenToQueue() {
       }
     }
     channel.ack(msg);
-  })
+  });
 }
 
 export async function sendRpc(queueName: string, requestPayload: any) {
-  const channel = await getChannel();
-  const q = await channel.assertQueue(queueName);
+  const channel = await getRpcChannel();
+  const q = await channel.assertQueue(queueName, { durable: true });
   const correlationId = uuid();
-  channel.sendToQueue(queueName, Buffer.from(JSON.stringify(requestPayload)), {
-    replyTo: q.queue,
-    correlationId: correlationId,
-  })
 
   return new Promise((resolve, reject) => {
     channel.consume(q.queue, (msg) => {
-      channel.ack(msg)
       if (msg.properties.correlationId === correlationId) {
         resolve(JSON.parse(msg.content.toString()));
-      } else {
-        reject('data not found');
+        channel.ack(msg)
       }
+    });
+
+    channel.sendToQueue(queueName, Buffer.from(JSON.stringify(requestPayload)), {
+      replyTo: q.queue,
+      correlationId: correlationId,
     })
   })
 }
 
 export async function publishMessage(queueName: string, requestPayload: any) {
-  const channel = await getChannel();
-  await channel.assertQueue(queueName);
+  const channel = await getRpcChannel();
+  await channel.assertQueue(queueName, { durable: true });
   channel.sendToQueue(queueName, Buffer.from(JSON.stringify(requestPayload)));
 }

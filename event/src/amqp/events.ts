@@ -4,4 +4,5 @@ export enum OutgoingEvents {
 
 export enum IncomingEvents {
   eventInfo = 'event_info',
+  decrementTickets = 'decrement_tickets',
 }
