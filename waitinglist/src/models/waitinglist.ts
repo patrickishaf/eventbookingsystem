@@ -22,3 +22,16 @@ export async function findWaitingListByEventId(id: number) {
   const waitingList = await query as WaitingListMember[];
   return waitingList;
 }
+
+export async function findFirstWaitingListMember(eventId: number) {
+  const query = db(_tableName).select('*').where('event_id', eventId).orderBy('created_at', 'asc').first();
+  const firstMember = (await query) as WaitingListMember;
+  return firstMember;
+}
+
+export async function deleteWaitingListMember(options: Partial<WaitingListMember>) {
+  if (Object.keys(options).length <= 0) return false;
+  const query = db(_tableName).delete().where(options)
+  await query;
+  return true;
+}

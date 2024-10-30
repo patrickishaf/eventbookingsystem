@@ -5,7 +5,7 @@ const waitlistService = {
 
   async addUserToWaitlist(user: Partial<WaitingListMember>) {
     return await insertWaitingListMember(user);
-  }
+  },
 };
 
 export default waitlistService;

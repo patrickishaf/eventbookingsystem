@@ -22,3 +22,9 @@ export async function findBookingById(id: number) {
   const booking = (await query) as Booking;
   return booking;
 }
+
+export async function deleteBooking(id: number) {
+  const query = db(_tableName).delete().where('id', id);
+  const result = await query;
+  return result;
+}

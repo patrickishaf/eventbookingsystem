@@ -5,9 +5,10 @@ import { getRpcChannel } from './connection';
 
 export async function listenToRpcQueue() {
   const channel = await getRpcChannel();
-  await channel.assertQueue(config.eventRpcQueue, { durable: true });
+  await channel.assertQueue(config.waitlistRpcQueue, { durable: true });
   channel.prefetch(1);
-  channel.consume(config.eventRpcQueue, async (msg) => {
+  channel.consume(config.waitlistRpcQueue, async (msg) => {
+    channel.ack(msg);
     if (msg.content) {
       const data = JSON.parse(msg.content.toString());
       console.log('waitlist RPC queue received a message', data);
@@ -23,7 +24,6 @@ export async function listenToRpcQueue() {
         handleQueueMessage(data);
       }
     }
-    channel.ack(msg);
   });
 }
 

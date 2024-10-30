@@ -7,7 +7,7 @@ import config from '../config';
 import { OutgoingEvents } from '../amqp/events';
 import { Event } from '../models/event';
 import bookingService from '../services/booking.service';
-import { Booking } from '../models/booking';
+import { Booking, deleteBooking, findBookingById } from '../models/booking';
 
 const bookingController = {
   async bookEvent(req: Request, res: Response) {
@@ -35,9 +35,9 @@ const bookingController = {
         const payload: Partial<Booking> = {
           event_id,
           user_email,
+          first_name,
+          last_name,
         }
-        if (first_name) payload.first_name = first_name;
-        if (last_name) payload.last_name = last_name;
 
         const booking = await bookingService.createBooking(payload);
         const msg = { event_id };
@@ -47,10 +47,10 @@ const bookingController = {
         // tell waitlist service to add user to waitlist
         const waitingListMember: any = {
           event_id,
-          user_email
+          user_email,
+          first_name,
+          last_name,
         };
-        if (first_name) waitingListMember.first_name = first_name;
-        if (last_name) waitingListMember.last_name = last_name;
 
         await publishMessage(config.waitlistQueue!, { event: OutgoingEvents.addToWaitlist, data: waitingListMember });
         return res.status(200).json('tickets have been sold out. you have been added to the waiting list');
@@ -62,6 +62,39 @@ const bookingController = {
   },
 
   async cancelBooking(req: Request, res: Response) {
+    try {
+      const schema = Joi.object({
+        booking_id: Joi.number().min(1).required(),
+      });
+      const errorMsg = await validateSchema(schema, req.params);
+      if (errorMsg) {
+        return res.status(400).json(errorMsg);
+      }
+
+      const { booking_id } = req.params;
+      const booking = await findBookingById(booking_id);
+      if (!booking) {
+        return res.status(400).json(`booking with if ${booking_id} does not exist`);
+      }
+      
+      const result = await deleteBooking(Number(booking_id));
+      const message = {
+        event_id: booking.event_id,
+      }
+      // publishMessage(config.waitlistQueue!, { event: OutgoingEvents.nextWaitlistMember, data: message });
+      const nextInLine = await sendRpc(config.waitlistRpcQueue!, { event: OutgoingEvents.nextWaitlistMember, data: message });
+      res.status(200).json({ message: 'booking cancelled', data: booking });
+
+      if (nextInLine) {
+        // if there is someone on the waiting list, create a booking for them and delete them from the waiting list
+        const { event_id, user_email, first_name, last_name } = nextInLine as Partial<Booking>;
+        await bookingService.createBooking({ event_id, user_email, first_name, last_name });
+        publishMessage(config.waitlistQueue!, { event_id, user_email });
+      }
+    } catch (err: any) {
+      console.log('failed to cancel booking. error:', err.message);
+      return res.status(500).json(err.message);
+    }
     return res.status(200).json('booking cancelled successfully');
   }
 };
