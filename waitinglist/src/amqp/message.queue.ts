@@ -1,93 +1,46 @@
 import config from '../config';
-import { getConnection } from './connection';
+import { v4 as uuid } from 'uuid';
+import handleQueueMessage from './queuemsghandler';
+import { getMessageChannel } from './connection';
 
-export function initializeMessageQueue() {
-  startPublisher();
-  startWorker();
-}
-
-var pubChannel = null;
-var offlinePubQueue = [];
-async function startPublisher() {
-  ((await getConnection()) as any).createConfirmChannel(function(err, ch) {
-    ch.on("error", function(err) {
-      console.error("[AMQP] channel error", err.message);
-    });
-    ch.on("close", function() {
-      console.log("[AMQP] channel closed");
-    });
-
-    pubChannel = ch;
-    while (true) {
-      var m = offlinePubQueue.shift();
-      if (!m) break;
-      publish(m[0], m[1], m[2]);
+export async function listenToMessageQueue() {
+  const channel = await getMessageChannel();
+  await channel.assertQueue(config.waitlistQueue, { durable: true });
+  channel.prefetch(1);
+  channel.consume(config.waitlistQueue, async (msg) => {
+    if (msg.content) {
+      const data = JSON.parse(msg.content.toString());
+      console.log('waitlist message queue received a message', data);
+      
+      const result = await handleQueueMessage(data);
+      console.log('RESULT FROM PROCESSSING NORMAL MESSAGE:', result);
     }
+    channel.ack(msg);
   });
 }
 
-export function publish(exchange, routingKey, content) {
-  try {
-    (pubChannel as any).publish(exchange, routingKey, content, { persistent: true, correlationId: 'teruei' }, (err, ok) => {
-      if (err) {
-        console.error("[AMQP] publish", err);
-        offlinePubQueue.push([exchange, routingKey, content] as never);
-        (pubChannel as any).connection.close();
-      } else if(ok) {
-        console.log('received rpc reponse from sender =>', ok.content.toString());
-      } else {
-        console.log('pushed message to the event queue', content.toString());
+export async function sendRpc(queueName: string, requestPayload: any) {
+  const channel = await getMessageChannel();
+  const q = await channel.assertQueue(queueName, { durable: true });
+  const correlationId = uuid();
+
+  return new Promise((resolve, reject) => {
+    channel.consume(q.queue, (msg) => {
+      if (msg.properties.correlationId === correlationId) {
+        resolve(JSON.parse(msg.content.toString()));
+        channel.ack(msg)
       }
+    });
+
+    channel.sendToQueue(queueName, Buffer.from(JSON.stringify(requestPayload)), {
+      replyTo: q.queue,
+      correlationId: correlationId,
     })
-  } catch (e: any) {
-    console.error("[AMQP] publish", e.message);
-    offlinePubQueue.push([exchange, routingKey, content] as never);
-  }
-}
-// A worker that acks messages only if processed succesfully
-async function startWorker() {
-  ((await getConnection()) as any).createChannel(function(err, ch) {
-    ch.on("error", function(err) {
-      console.error("[AMQP] channel error", err.message);
-    });
-
-    ch.on("close", function() {
-      console.log("[AMQP] channel closed");
-    });
-
-    ch.prefetch(10);
-    ch.assertQueue("jobs", { durable: true }, function(err, _ok) {
-      ch.consume("jobs", processMsg, { noAck: false });
-      console.log("Worker is started");
-    });
-
-    function processMsg(msg) {
-      work(msg, function(ok) {
-        try {
-          if (ok)
-            ch.ack(msg);
-          else
-            ch.reject(msg, true);
-        } catch (e) {
-          closeOnErr(e);
-        }
-      });
-    }
-  });
+  })
 }
 
-function work(msg, cb) {
-  console.log("Got msg in the booking queue", msg.content.toString());
-  cb(true);
+export async function publishMessage(queueName: string, requestPayload: any) {
+  const channel = await getMessageChannel();
+  await channel.assertQueue(queueName, { durable: true });
+  channel.sendToQueue(queueName, Buffer.from(JSON.stringify(requestPayload)));
 }
-
-async function closeOnErr(err) {
-  if (!err) return false;
-  console.error("[AMQP] error", err);
-  ((await getConnection()) as any).close();
-  return true;
-}
-
-setInterval(function() {
-  publish("", config.eventQueue, Buffer.from(JSON.stringify({ event: 'event', data: 'data' })));
-}, 1000);

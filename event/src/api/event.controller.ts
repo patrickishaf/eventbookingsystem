@@ -1,5 +1,6 @@
 import {Request, Response} from 'express';
-import { publishMessage, sendRpc } from '../amqp/rpc.queue';
+import { sendRpc } from '../amqp/rpc.queue';
+import { publishMessage } from '../amqp/message.queue';
 import config from '../config';
 import Joi from 'joi';
 import { validateSchema } from '../utils';

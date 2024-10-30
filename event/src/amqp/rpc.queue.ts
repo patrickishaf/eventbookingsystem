@@ -47,8 +47,8 @@ export async function sendRpc(queueName: string, requestPayload: any) {
   })
 }
 
-export async function publishMessage(queueName: string, requestPayload: any) {
-  const channel = await getRpcChannel();
-  await channel.assertQueue(queueName, { durable: true });
-  channel.sendToQueue(queueName, Buffer.from(JSON.stringify(requestPayload)));
-}
+// export async function publishMessage(queueName: string, requestPayload: any) {
+//   const channel = await getRpcChannel();
+//   await channel.assertQueue(queueName, { durable: true });
+//   channel.sendToQueue(queueName, Buffer.from(JSON.stringify(requestPayload)));
+// }
