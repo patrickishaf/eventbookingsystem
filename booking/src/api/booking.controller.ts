@@ -74,28 +74,34 @@ const bookingController = {
       const { booking_id } = req.params;
       const booking = await findBookingById(booking_id);
       if (!booking) {
-        return res.status(400).json(`booking with if ${booking_id} does not exist`);
+        return res.status(400).json(`booking with ID ${booking_id} does not exist`);
       }
       
       const result = await deleteBooking(Number(booking_id));
+      res.status(200).json({ message: 'booking cancelled', data: booking });
+
       const message = {
         event_id: booking.event_id,
       }
       // publishMessage(config.waitlistQueue!, { event: OutgoingEvents.nextWaitlistMember, data: message });
       const nextInLine = await sendRpc(config.waitlistRpcQueue!, { event: OutgoingEvents.nextWaitlistMember, data: message });
-      res.status(200).json({ message: 'booking cancelled', data: booking });
 
       if (nextInLine) {
         // if there is someone on the waiting list, create a booking for them and delete them from the waiting list
         const { event_id, user_email, first_name, last_name } = nextInLine as Partial<Booking>;
         await bookingService.createBooking({ event_id, user_email, first_name, last_name });
-        publishMessage(config.waitlistQueue!, { event_id, user_email });
+        publishMessage(config.waitlistQueue!, {
+          event: OutgoingEvents.deleteNextInLine,
+          data: {
+            event_id,
+            user_email,
+          }
+        });
       }
     } catch (err: any) {
       console.log('failed to cancel booking. error:', err.message);
       return res.status(500).json(err.message);
     }
-    return res.status(200).json('booking cancelled successfully');
   }
 };
 

@@ -9,7 +9,7 @@ export interface WaitingListMember {
   created_at: Date;
 }
 
-const _tableName = 'waiting_list';
+const _tableName = 'waiting_list_members';
 
 export async function insertWaitingListMember(item: Partial<WaitingListMember>) {
   const query = db(_tableName).insert(item);

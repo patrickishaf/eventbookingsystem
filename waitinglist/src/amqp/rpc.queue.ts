@@ -8,22 +8,24 @@ export async function listenToRpcQueue() {
   await channel.assertQueue(config.waitlistRpcQueue, { durable: true });
   channel.prefetch(1);
   channel.consume(config.waitlistRpcQueue, async (msg) => {
-    channel.ack(msg);
     if (msg.content) {
       const data = JSON.parse(msg.content.toString());
       console.log('waitlist RPC queue received a message', data);
       
       if (msg.properties.correlationId) {
         console.log('processing rpc', data);
+        if (!data) {
+          console.log('invalid data: ', data);
+          channel.ack(msg);
+          return;
+        }
         const result = await handleQueueMessage(data);
         channel.sendToQueue(msg.properties.replyTo, Buffer.from(JSON.stringify(result)), {
           correlationId: msg.properties.correlationId,
         })
-      } else {
-        console.log('processing regular msg');
-        handleQueueMessage(data);
       }
     }
+    channel.ack(msg);
   });
 }
 

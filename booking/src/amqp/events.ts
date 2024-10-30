@@ -2,6 +2,7 @@ export enum OutgoingEvents {
   eventInfo = 'event_info',
   addToWaitlist = 'add_to_waitlist',
   decrementTickets = 'decrement_tickets',
+  deleteNextInLine = 'delete_next_in_line',
   nextWaitlistMember = 'next_waitlist_member',
 }
 
