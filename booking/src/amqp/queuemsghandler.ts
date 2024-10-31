@@ -1,3 +1,4 @@
+import { findBookingsByEventId } from "../models/booking";
 import { IncomingEvents } from "./events";
 
 export default async function handleQueueMessage(payload: any) {
@@ -12,7 +13,7 @@ export default async function handleQueueMessage(payload: any) {
   
     default:
       console.log('unrecognized event');
-      break;
+      return 'unrecognized event';
   }
 }
 
@@ -21,5 +22,15 @@ async function handleNextInLineEvent(data: any) {
 }
 
 async function handleBookingInfoEvent(data: any) {
-  return undefined;
+  try {
+    const { event_id } = data;
+    const bookings = await findBookingsByEventId(event_id);
+    if (!bookings) {
+      return false;
+    }
+    return bookings;
+  } catch (err: any) {
+    console.error('failed to get booking info for event');
+    return false;
+  }
 }

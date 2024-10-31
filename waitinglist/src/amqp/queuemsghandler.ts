@@ -49,4 +49,16 @@ async function handleDeleteNextInLine(data: any) {
   }
 }
 
-async function handleGetWaitingList(data: any) {}
+async function handleGetWaitingList(data: any) {
+  try {
+    const { event_id } = data;
+    const waitingList = await findWaitingListByEventId(event_id);
+    if (!waitingList) {
+      return false;
+    }
+    return waitingList;
+  } catch (err: any) {
+    console.error('failed to get waiting list');
+    return false;
+  }
+}

@@ -13,6 +13,5 @@ export default async function handleQueueMessage(payload: any) {
     default:
       console.log('unrecognized event');
       return 'unrecognized event';
-      break;
   }
 }

@@ -10,10 +10,15 @@ export async function listenToRpcQueue() {
   channel.consume(config.bookingRpcQueue, async (msg) => {
     if (msg.content) {
       const data = JSON.parse(msg.content.toString());
-      console.log('event RPC queue received a message', data);
+      console.log('booking RPC queue received a message', data);
       
       if (msg.properties.correlationId) {
         console.log('processing rpc', data);
+        if (!data) {
+          console.log('invalid data: ', data);
+          channel.ack(msg);
+          return;
+        }
         const result = await handleQueueMessage(data);
         channel.sendToQueue(msg.properties.replyTo, Buffer.from(JSON.stringify(result)), {
           correlationId: msg.properties.correlationId,
